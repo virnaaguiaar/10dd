@@ -13,6 +13,7 @@
 #include <WiFiClient.h>
 #include <WebServer.h>
 #include <Update.h>
+#include <math.h>
 
 #include "Configs.h"
 #include "mp3.h"
@@ -20,5 +21,6 @@
 #include "CoreoBritney.h"
 #include "MQTTWebSocketCorrect.h"
 #include "OtaSetup.h"
+#include "Odometry.h"  // NOVO
 
 #endif

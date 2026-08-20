@@ -1,247 +1,186 @@
 #ifndef MOVIMENTO_H
 #define MOVIMENTO_H
 
-void PWM(int dirX,int dirY){
-  // Aplica correção automática apenas no eixo X (movimento frente/trás)
-  int Resq = (dirX + dirY) * fatorCorrecaoEsquerda;
-  int Rdir = (dirX - dirY) * fatorCorrecaoDireita;
-  
-  if(Resq>9) {Resq = 9;}
-  if(Resq<-9) {Resq = -9;}
-  if(Rdir>9) {Rdir = 9;}
-  if(Rdir<-9) {Rdir = -9;}
-  
-  int PWMe;
-  int PWMd;
-  
-  if(Resq == 0) {PWMe = 0;}
-  if(Resq > 0) {PWMe = 120 + Resq*15;}
-  if(Resq < 0) {PWMe = -120 + Resq*15;}
+#include "Odometry.h"
 
-  if(Rdir == 0) {PWMd = 0;}
-  if(Rdir > 0) {PWMd = 120 + Rdir*15;}
-  if(Rdir < 0) {PWMd = -120 + Rdir*15;}
-
-  if(PWMe>=0) {
-    ledcWrite(1, PWMe);
-    ledcWrite(0, 0);
-  } else {
-    ledcWrite(1, 0);
-    ledcWrite(0, -PWMe);
-  }
-  if(PWMd>=0) {
-    ledcWrite(3, PWMd);
-    ledcWrite(2, 0);
-  } else {
-    ledcWrite(3, 0);
-    ledcWrite(2, -PWMd);
-  }
+// Padrões de LEDs para cada movimento
+void ledsFrente() {
+    digitalWrite(led[0], HIGH);
+    digitalWrite(led[1], HIGH);
+    digitalWrite(led[2], HIGH);
+    digitalWrite(led[3], LOW);
+    digitalWrite(led[4], LOW);
+    digitalWrite(led[5], LOW);
+    digitalWrite(led[6], LOW);
+    digitalWrite(led[7], LOW);
 }
 
-//"para()" serve para que o carrinho pare qualquer movimento ->
-void para(){
-  PWM(0,0);  
-  delay(50);
+void ledsTras() {
+    digitalWrite(led[5], HIGH);
+    digitalWrite(led[6], HIGH);
+    digitalWrite(led[7], HIGH);
+    digitalWrite(led[0], LOW);
+    digitalWrite(led[1], LOW);
+    digitalWrite(led[2], LOW);
+    digitalWrite(led[3], LOW);
+    digitalWrite(led[4], LOW);
 }
 
-// Função para calibrar automaticamente
-void calibrarMotores() {
-    if (!calibracaoAtiva) {
-        calibracaoAtiva = true;
-        tempoCalibracao = millis();
-        resetEncoders();
-        Serial.println("[CALIBRACAO] Iniciando calibração automática...");
-        
-        // Move para frente por 3 segundos para calibrar
-        unsigned long startTime = millis();
-        while (millis() - startTime < 3000) {
-            // PWM direto sem correção para calibração
-            int Resq = 9;
-            int Rdir = 9;
-            
-            int PWMe = 120 + Resq*15;
-            int PWMd = 120 + Rdir*15;
-            
-            ledcWrite(1, PWMe);
-            ledcWrite(0, 0);
-            ledcWrite(3, PWMd);
-            ledcWrite(2, 0);
-            
-            delay(10);
-            
-            // Verifica se atingiu pulsos suficientes
-            if (pulsosEncoderE >= pulsosAlvoCalibracao && pulsosEncoderD >= pulsosAlvoCalibracao) {
-                break;
-            }
-        }
-        para();
-        
-        // Calcula a correção
-        if (pulsosEncoderE > 0 && pulsosEncoderD > 0) {
-            float razao = (float)pulsosEncoderD / pulsosEncoderE;
-            fatorCorrecaoEsquerda = 1.0 * razao;
-            fatorCorrecaoDireita = 1.0;
-            
-            Serial.print("[CALIBRACAO] Pulsos E:");
-            Serial.print(pulsosEncoderE);
-            Serial.print(" D:");
-            Serial.print(pulsosEncoderD);
-            Serial.print(" | Razão: ");
-            Serial.print(razao);
-            Serial.print(" | Correção Esquerda: ");
-            Serial.println(fatorCorrecaoEsquerda);
-        }
-        
-        calibracaoAtiva = false;
-        resetEncoders();
+void ledsGiraEsquerda() {
+    digitalWrite(led[0], HIGH);
+    digitalWrite(led[3], HIGH);
+    digitalWrite(led[6], HIGH);
+    digitalWrite(led[1], LOW);
+    digitalWrite(led[2], LOW);
+    digitalWrite(led[4], LOW);
+    digitalWrite(led[5], LOW);
+    digitalWrite(led[7], LOW);
+}
+
+void ledsGiraDireita() {
+    digitalWrite(led[2], HIGH);
+    digitalWrite(led[5], HIGH);
+    digitalWrite(led[7], HIGH);
+    digitalWrite(led[0], LOW);
+    digitalWrite(led[1], LOW);
+    digitalWrite(led[3], LOW);
+    digitalWrite(led[4], LOW);
+    digitalWrite(led[6], LOW);
+}
+
+void ledsParado() {
+    for(int i = 0; i < 8; i++) {
+        digitalWrite(led[i], LOW);
     }
 }
 
+void PWM(int dirX, int dirY) {
+    int Resq = (dirX + dirY) * fatorCorrecaoEsquerda;
+    int Rdir = (dirX - dirY) * fatorCorrecaoDireita;
+    
+    if(Resq > 9) { Resq = 9; }
+    if(Resq < -9) { Resq = -9; }
+    if(Rdir > 9) { Rdir = 9; }
+    if(Rdir < -9) { Rdir = -9; }
+    
+    // Controle de LEDs baseado no movimento
+    if (dirX > 0 && dirY == 0) ledsFrente();
+    else if (dirX < 0 && dirY == 0) ledsTras();
+    else if (dirY < 0 && dirX == 0) ledsGiraEsquerda();
+    else if (dirY > 0 && dirX == 0) ledsGiraDireita();
+    else if (dirX == 0 && dirY == 0) ledsParado();
+    else if (dirX > 0 && dirY > 0) { ledsFrente(); digitalWrite(led[2], HIGH); digitalWrite(led[5], HIGH); }
+    else if (dirX > 0 && dirY < 0) { ledsFrente(); digitalWrite(led[0], HIGH); digitalWrite(led[3], HIGH); }
+    else if (dirX < 0 && dirY > 0) { ledsTras(); digitalWrite(led[2], HIGH); digitalWrite(led[5], HIGH); }
+    else if (dirX < 0 && dirY < 0) { ledsTras(); digitalWrite(led[0], HIGH); digitalWrite(led[3], HIGH); }
+    
+    int PWMe, PWMd;
+    
+    if(Resq == 0) PWMe = 0;
+    else if(Resq > 0) PWMe = 120 + Resq * 15;
+    else PWMe = -120 + Resq * 15;
+    
+    if(Rdir == 0) PWMd = 0;
+    else if(Rdir > 0) PWMd = 120 + Rdir * 15;
+    else PWMd = -120 + Rdir * 15;
+    
+    if(PWMe >= 0) {
+        ledcWrite(1, PWMe);
+        ledcWrite(0, 0);
+    } else {
+        ledcWrite(1, 0);
+        ledcWrite(0, -PWMe);
+    }
+    if(PWMd >= 0) {
+        ledcWrite(3, PWMd);
+        ledcWrite(2, 0);
+    } else {
+        ledcWrite(3, 0);
+        ledcWrite(2, -PWMd);
+    }
+}
+
+void para() {
+    PWM(0, 0);
+    ledsParado();
+    delay(50);
+}
+
 void SetupLeds() {
-  pinMode(motor1Pin1, OUTPUT);
-  pinMode(motor1Pin2, OUTPUT);
-  pinMode(motor2Pin1, OUTPUT);
-  pinMode(motor2Pin2, OUTPUT);
-
-  ledcSetup(0, PWM_FREQ, PWM_RESOLUTION);
-  ledcSetup(1, PWM_FREQ, PWM_RESOLUTION);
-  ledcSetup(2, PWM_FREQ, 8);
-  ledcSetup(3, PWM_FREQ, PWM_RESOLUTION);
-  ledcAttachPin(motor1Pin1, 0);
-  ledcAttachPin(motor1Pin2, 1);
-  ledcAttachPin(motor2Pin1, 2);
-  ledcAttachPin(motor2Pin2, 3);
-
-  for(int i = 0; i<8;i++){
-    pinMode(led[i],OUTPUT);
-  };
+    pinMode(motor1Pin1, OUTPUT);
+    pinMode(motor1Pin2, OUTPUT);
+    pinMode(motor2Pin1, OUTPUT);
+    pinMode(motor2Pin2, OUTPUT);
+    
+    ledcSetup(0, PWM_FREQ, PWM_RESOLUTION);
+    ledcSetup(1, PWM_FREQ, PWM_RESOLUTION);
+    ledcSetup(2, PWM_FREQ, 8);
+    ledcSetup(3, PWM_FREQ, PWM_RESOLUTION);
+    ledcAttachPin(motor1Pin1, 0);
+    ledcAttachPin(motor1Pin2, 1);
+    ledcAttachPin(motor2Pin1, 2);
+    ledcAttachPin(motor2Pin2, 3);
+    
+    for(int i = 0; i < 8; i++) {
+        pinMode(led[i], OUTPUT);
+    }
+    ledsParado();
 }
 
-void ligaLeds(){
-  iled = 0;
-  while(iled<8) {
-    digitalWrite(led[iled],HIGH);
-    iled++;
-  }
+void ligaLeds() {
+    for(int i = 0; i < 8; i++) digitalWrite(led[i], HIGH);
 }
 
-void desligaLeds(){
-  iled = 0;
-  while(iled<8) {
-    digitalWrite(led[iled],LOW);
-    iled++;
-  }
+void desligaLeds() {
+    for(int i = 0; i < 8; i++) digitalWrite(led[i], LOW);
 }
 
-void acendeLeds(int a, int b, int c, int d, int e, int f, int g, int h){
-  if (a == 1) {
-    digitalWrite(led[0],HIGH);
-  } else {
-    digitalWrite(led[0],LOW);
-  }
-  if (b == 1) {
-    digitalWrite(led[1],HIGH);
-  } else {
-    digitalWrite(led[1],LOW);
-  }
-  if (c == 1) {
-    digitalWrite(led[2],HIGH);
-  } else {
-    digitalWrite(led[2],LOW);
-  }
-  if (d == 1) {
-    digitalWrite(led[3],HIGH);
-  } else {
-    digitalWrite(led[3],LOW);
-  }
-  if (e == 1) {
-    digitalWrite(led[4],HIGH);
-  } else {
-    digitalWrite(led[4],LOW);
-  }
-  if (f == 1) {
-    digitalWrite(led[5],HIGH);
-  } else {
-    digitalWrite(led[5],LOW);
-  }
-  if (g == 1) {
-    digitalWrite(led[6],HIGH);
-  } else {
-    digitalWrite(led[6],LOW);
-  }
-  if (h == 1) {
-    digitalWrite(led[7],HIGH);
-  } else {
-    digitalWrite(led[7],LOW);
-  }
-  
+void movF(int timer) {
+    PWM(9, 0);
+    delay(timer);
+    para();
 }
 
-//"movF()" serve para que o carrinho realize o movimento frontal ->
-void movF(int timer){
-  // Calibra na primeira execução
-  static bool primeiraVez = true;
-  if (primeiraVez) {
-      calibrarMotores();
-      primeiraVez = false;
-  }
-  
-  PWM(9,0);
-  delay(50); 
-  delay(timer);
+void movT(int timer) {
+    PWM(-9, 0);
+    delay(timer);
+    para();
 }
 
-//"movT()" serve para que o carrinho realize o movimento trazeiro ->
-void movT(int timer){
-  PWM(-9,0);
-  delay(50);
-  delay(timer);
-}
-
-//"girD()" serve para que o carrinho realize o movimento circular horário em seu próprio eixo ->
 void girD(int timer) {
-  PWM(0,4);
-  delay(50);
-  delay(timer);
+    PWM(0, 4);
+    delay(timer);
+    para();
 }
 
-//"girE()" serve para que o carrinho realize o movimento circular anti-horário em seu próprio eixo ->
 void girE(int timer) {
-  PWM(0,-4);
-  delay(50);
-  delay(timer);
+    PWM(0, -4);
+    delay(timer);
+    para();
 }
 
-void giroe(int timer){
-  Serial.println(timer);
-}
-
-//"rotE_F()" serve para que o carrinho realize o movimento circular anti-horário no eixo da roda esquerda ->
 void rotE_F(int timer) {
-  PWM(+5,-5);
-  delay(50);
-  delay(timer);
+    PWM(5, -5);
+    delay(timer);
+    para();
 }
 
-//"rotE_T()" serve para que o carrinho realize o movimento circular horário no eixo da roda esquerda ->
 void rotE_T(int timer) {
-  PWM(-5,+5);
-  delay(50);
-  delay(timer);
+    PWM(-5, 5);
+    delay(timer);
+    para();
 }
 
-//"rotD_F()" serve para que o carrinho realize o movimento circular anti-horário no eixo da roda direita ->
 void rotD_F(int timer) {
-  PWM(+5,+5);
-  delay(50);
-  delay(timer);
+    PWM(5, 5);
+    delay(timer);
+    para();
 }
 
-//"rotD_T()" serve para que o carrinho realize o movimento circular horário no eixo da roda direita ->
 void rotD_T(int timer) {
-  PWM(-5,-5);
-  delay(50);
-  delay(timer);
+    PWM(-5, -5);
+    delay(timer);
+    para();
 }
 
 #endif
