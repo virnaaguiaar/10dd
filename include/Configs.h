@@ -27,8 +27,8 @@ bool mqttConnected = false;
 const char* mqtt_server = "wf671196.ala.us-east-1.emqxsl.com";
 const int mqtt_port = 8084;  // MQTT over WebSocket
 const char* mqtt_path = "/mqtt";
-const char* mqtt_user = "baile";     // Username
-const char* mqtt_password = "baile10";   // Password
+const char* mqtt_user = "baile";     
+const char* mqtt_password = "baile10";   
 
 //PWM
 #define PWM_FREQ 1000
