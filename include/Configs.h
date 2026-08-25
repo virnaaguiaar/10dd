@@ -26,7 +26,7 @@ WebSocketsClient webSocket;
 bool mqttConnected = false;
 
 // Configurações MQTT
-const char* mqtt_server = "ycff1281.ala.eu-central-1.emqxsl.com";
+const char* mqtt_server = "e2792d91.ala.us-east-1.emqxsl.com";
 const int mqtt_port = 8084;
 const char* mqtt_path = "/mqtt";
 const char* mqtt_user = "baile";     
