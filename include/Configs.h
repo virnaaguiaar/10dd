@@ -157,7 +157,7 @@ void carregarIdRobo() {
   EEPROM.begin(32);
   char storedId[16];
   for (int i = 0; i < 15; i++) {
-    storedId[i] = EEPROM.read(ROBOT_ID_ADDR + i);
+    storedId[i] = EEPROM.read(ID_ROBO + i);
     if (storedId[i] == 0) break;
   }
   storedId[15] = '\0';
@@ -172,7 +172,7 @@ void carregarIdRobo() {
 void salvarIdRobo(const char* novoIdRobo) {
   EEPROM.begin(32);
   for (int i = 0; i < 16 && novoIdRobo[i] != '\0'; i++) {
-    EEPROM.write(ROBOT_ID_ADDR + i, novoIdRobo[i]);
+    EEPROM.write(ID_ROBO + i, novoIdRobo[i]);
   }
   EEPROM.commit();
   EEPROM.end();
