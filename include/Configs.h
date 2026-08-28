@@ -11,7 +11,7 @@
 #include <DFRobotDFPlayerMini.h>
 
 //Versão do Codigo
-const char* version = "V2.0-MULTIROBOT";
+const char* version = "V3.0-MULTIROBOT";
 
 //WIFI
 const char* ssid = "baile10";
