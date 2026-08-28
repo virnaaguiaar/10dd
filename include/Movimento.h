@@ -2,8 +2,9 @@
 #define MOVIMENTO_H
 
 #include "Odometry.h"
-
+//quarto
 // Padrões de LEDs para cada movimento
+//colocar random???
 void ledsFrente() {
     digitalWrite(led[0], HIGH);
     digitalWrite(led[1], HIGH);
@@ -54,54 +55,233 @@ void ledsParado() {
     }
 }
 
-void PWM(int dirX, int dirY) {
-    int Resq = (dirX + dirY) * fatorCorrecaoEsquerda;
-    int Rdir = (dirX - dirY) * fatorCorrecaoDireita;
+void atualizarOdometria(){
+    static unsigned long tempoFinal = 0;
+    unsigned long tempoAtual = millis();
+    float deltaTempo = (tempoAtual - tempoFinal) / 1000.0; // (s))
+    if (deltaTempo < 0.01) return 0; //evita divisao por zero
+
+    int deltaPulsosDir = pulsosEncoderD - ultimoPulsosEncoderD;// Atualização de quantos pulsos desde a leitura mais nova 
+    int deltaPulsosEsq = pulsosEncoderE - ultimoPulsosEncoderE; 
+
+    float distRodaDir = deltaPulsosDir * DIST_POR_PULSO; //Distância percorrida pela roda (m)
+    float distRodaEsq = deltaPulsosEsq * DIST_POR_PULSO;
+
+    float velocRodaDir = distRodaDir / deltaTempo; //Velocidade da roda (m/s)
+    float velocRodaEsq = distRodaEsq / deltaTempo;
+
+    roboVxLinear = (velocRodaDir + velocRodaEsq) / 2.0; //Velocidade linear do robô
+    roboVthetaAngular = (velocRodaDir - velocRodaEsq) / BASE_RODAS; //Velocidade angular do robô (rad/s)
+
+    //Atualizar posição
+    roboX += roboVxLinear * cos(roboTheta) * deltaTempo;
+    roboY += roboVxLinear * sin(roboTheta) * deltaTempo;
+    roboTheta += roboVthetaAngular * deltaTempo;
+
+    //Normalizar para [-pi, pi], evitar ângulos confusos e saber sempre paar onde está opontando
+    //evita overflow, facilita comparação como os ângulos são cíclicos
+    while(roboTheta > PI){
+        roboTheta -= 2*PI;
+    }
+    while(roboTheta < -PI){
+        roboTheta += 2*PI;
+    }
+
+    distTotalPercorrida += abs(roboVxLinear) * deltaTempo;
+
+    ultimoPulsosEncoderD = pulsosEncoderD;
+    ultimoPulsosEncoderE = pulsosEncoderE;
+    tempoFinal = tempoAtual;
+}
+
+void resetarOdometria(){
+    roboX = 0.0;
+    roboY = 0.0;
+    roboTheta = 0.0;
+    roboVxLinear = 0.0;
+    roboVyLinear = 0.0;
+    roboVthetaAngular = 0.0;
+    distTotalPercorrida = 0.0;
+
+    pulsosEncoderD = 0;
+    pulsosEncoderE = 0;
+    ultimoPulsosEncoderD = 0;
+    ultimoPulsosEncoderE = 0;
+
+    Serial.println("🔄 Odometria resetada!");
+}
+
+void atualizarVelocidades(){
+    velocRealEsquerda = lerVelocRealEsquerda();
+    velocRealDireita = lerVelocRealDireita();
+}
+
+float lerVelocRealEsquerda(){
+    static unsigned long tempoFinal = 0;
+    static int pulsoFinal = 0;
+
+    unsigned long tempoAtual = millis();
+    unsigned long deltaTempo = tempoAtual - tempoFinal;
+    if (deltaTempo < 10) return 0;
+
+    int pulsoAtual = pulsosEncoderE;
+    int deltaPulso = pulsoAtual - pulsoFinal;
+
+    float velocidade = (deltaPulso*DIST_POR_PULSO) / (deltaTempo/1000.0);
+
+    tempoFinal = tempoAtual;
+    pulsoFinal = pulsoAtual;
+
+    return velocRealEsquerda; // m/s
+}
+
+float lerVelocRealDireita(){
+    static unsigned long tempoFinal = 0;
+    static int pulsoFinal = 0;
+
+    unsigned long tempoAtual = millis();
+    unsigned long deltaTempo = tempoAtual - tempoFinal;
+    if (deltaTempo < 10) return 0; //evita divisao por zero
+
+    int pulsoAtual = pulsosEncoderD;
+    int deltaPulso = pulsoAtual - pulsoFinal;
+
+    float velocidade = (deltaPulso*DIST_POR_PULSO) / (deltaTempo/1000.0);
+
+    tempoFinal = tempoAtual;
+    pulsoFinal = pulsoAtual;
+
+    return velocRealDireita; // m/s
+}
+
+float calcularPID(float erro){
+    float erroProporcional = erro;
+
+    float erroIntegral += erro;
+    if (erroIntegral > 5.0) erroIntegral = 5.0; //evitar overshoot
+    if (erroIntegral < -5.0) erroIntegral = -5.0;
+
+    erroDerivativo = erro - erroAnterior;
+    erroAnterior = erro;
+
+    float correcao_PID = (Kp*erroProporcional) + (Ki*erroIntegral) + (Kd*erroDerivativo);
+    if (correcaoPID > correcaoMaxPID) {correcaoPID = correcaoMaxPID;}
+    if (correcaoPID < -correcaoMaxPID) {correcaoPID = -correcaoMaxPID;}
+
+    return correcao_PID;
+}
+
+void resetarPID(){
+    erroAnterior = 0;
+    erroIntegral = 0;
+    correcaoPID = 0;
+}
+
+void PWM_PID(int direcaoX, int direcaoY) {
+    atualizarOdometria();
+
+    velocDesejada = direcaoX;
+    rotacDesejada = direcaoY;
     
-    if(Resq > 9) { Resq = 9; }
-    if(Resq < -9) { Resq = -9; }
-    if(Rdir > 9) { Rdir = 9; }
-    if(Rdir < -9) { Rdir = -9; }
+    int resultBrutoEsq = (direcaoX + direcaoY) * fatorCorrecaoEsquerda;
+    int resultBrutoDir = (direcaoX - direcaoY) * fatorCorrecaoDireita;
     
-    // Controle de LEDs baseado no movimento
-    if (dirX > 0 && dirY == 0) ledsFrente();
-    else if (dirX < 0 && dirY == 0) ledsTras();
-    else if (dirY < 0 && dirX == 0) ledsGiraEsquerda();
-    else if (dirY > 0 && dirX == 0) ledsGiraDireita();
-    else if (dirX == 0 && dirY == 0) ledsParado();
-    else if (dirX > 0 && dirY > 0) { ledsFrente(); digitalWrite(led[2], HIGH); digitalWrite(led[5], HIGH); }
-    else if (dirX > 0 && dirY < 0) { ledsFrente(); digitalWrite(led[0], HIGH); digitalWrite(led[3], HIGH); }
-    else if (dirX < 0 && dirY > 0) { ledsTras(); digitalWrite(led[2], HIGH); digitalWrite(led[5], HIGH); }
-    else if (dirX < 0 && dirY < 0) { ledsTras(); digitalWrite(led[0], HIGH); digitalWrite(led[3], HIGH); }
+    atualizarVelocidades();
+
+    float erro = velocRealDireita - velocRealEsquerda;
+
+    // Correção
+    correcaoPID = calcularPID(erro);
+
+    // Correção em linha reta
+    int resultLiquidoEsq, resultLiquidoDir;
+    if (direcaoX != 0 && direcaoY == 0){
+        resultLiquidoEsq = resultBrutoEsq + correcaoPID;
+        resultLiquidoDir = resultBrutoDir - correcaoPID;
+    } else {
+        resultLiquidoDir = resultBrutoDir;
+        resultLiquidoEsq = resultBrutoEsq;
+    }
+
+    //Limita valores para o PWM
+    if(resultLiquidoEsq > 9){ 
+        resultLiquidoEsq = 9; 
+    }
+    if(resultLiquidoEsq < -9){ 
+        resultLiquidoEsq = -9; 
+    }
+    if(resultLiquidoDir > 9){ 
+        resultLiquidoDir = 9; 
+    }
+    if(resultLiquidoDir < -9){
+        resultLiquidoDir = -9; 
+    }
+
+    // Converte para PWM
+    int PWMEsq, PWMDir;
     
-    int PWMe, PWMd;
-    
-    if(Resq == 0) PWMe = 0;
-    else if(Resq > 0) PWMe = 120 + Resq * 15;
-    else PWMe = -120 + Resq * 15;
-    
-    if(Rdir == 0) PWMd = 0;
-    else if(Rdir > 0) PWMd = 120 + Rdir * 15;
-    else PWMd = -120 + Rdir * 15;
-    
-    if(PWMe >= 0) {
-        ledcWrite(1, PWMe);
+    if(resultLiquidoEsq == 0) {
+        PWMEsq = 0;
+    } else if(resultLiquidoEsq > 0) {
+        PWMEsq = 120 + (resultLiquidoEsq * 15);
+    }else {
+        PWMEsq = -120 + (resultLiquidoEsq * 15);
+    }
+
+    if(resultLiquidoDir == 0) {
+        PWMDir = 0;
+    } else if(resultLiquidoDir > 0) {
+        PWMDir = 120 + (resultLiquidoDir * 15);
+    } else {
+        PWMDir = -120 + (resultLiquidoDir * 15);
+    }
+
+    // Para os motores
+    // ledcWrite(canal, valor) (0 até 15 no esp, 0 até 255)
+    if(PWMEsq >= 0) {
+        ledcWrite(1, PWMEsq);
         ledcWrite(0, 0);
     } else {
         ledcWrite(1, 0);
-        ledcWrite(0, -PWMe);
+        ledcWrite(0, -PWMEsq);
     }
-    if(PWMd >= 0) {
-        ledcWrite(3, PWMd);
+    if(PWMDir >= 0) {
+        ledcWrite(3, PWMDir);
         ledcWrite(2, 0);
     } else {
         ledcWrite(3, 0);
-        ledcWrite(2, -PWMd);
+        ledcWrite(2, -PWMDir);
+    }
+
+    // Controle de LEDs baseado no movimento
+    if (direcaoX > 0 && direcaoY == 0) ledsFrente();
+    else if (direcaoX < 0 && direcaoY == 0) ledsTras();
+    else if (direcaoY < 0 && direcaoX == 0) ledsGiraEsquerda();
+    else if (direcaoY > 0 && direcaoX == 0) ledsGiraDireita();
+    else if (direcaoX == 0 && direcaoY == 0) ledsParado();
+    
+    else if (direcaoX > 0 && direcaoY > 0){ 
+        ledsFrente(); digitalWrite(led[2], HIGH); 
+        digitalWrite(led[5], HIGH); 
+    }
+    else if (direcaoX > 0 && direcaoY < 0){ 
+        ledsFrente(); digitalWrite(led[0], HIGH); 
+        digitalWrite(led[3], HIGH); 
+    }
+    else if (direcaoX < 0 && direcaoY > 0){
+        ledsTras(); 
+        digitalWrite(led[2], HIGH); 
+        digitalWrite(led[5], HIGH); 
+    }
+    else if (direcaoX < 0 && direcaoY < 0){
+        ledsTras(); 
+        digitalWrite(led[0], HIGH); 
+        digitalWrite(led[3], HIGH); 
     }
 }
 
 void para() {
-    PWM(0, 0);
+    PWM_PID(0, 0);
     ledsParado();
     delay(50);
 }
@@ -112,10 +292,12 @@ void SetupLeds() {
     pinMode(motor2Pin1, OUTPUT);
     pinMode(motor2Pin2, OUTPUT);
     
+    // Configuração dos canais   
     ledcSetup(0, PWM_FREQ, PWM_RESOLUTION);
     ledcSetup(1, PWM_FREQ, PWM_RESOLUTION);
     ledcSetup(2, PWM_FREQ, 8);
     ledcSetup(3, PWM_FREQ, PWM_RESOLUTION);
+
     ledcAttachPin(motor1Pin1, 0);
     ledcAttachPin(motor1Pin2, 1);
     ledcAttachPin(motor2Pin1, 2);
@@ -135,52 +317,158 @@ void desligaLeds() {
     for(int i = 0; i < 8; i++) digitalWrite(led[i], LOW);
 }
 
-void movF(int timer) {
-    PWM(9, 0);
+//Movimentos precisos
+void movFrentePreciso(float distMetros) {
+    resetarPID();
+    
+    float posicaoInicial = roboX;
+    float distanciaPercorrida = 0;
+    int sinal = (distMetros > 0) ? 1 : -1; //1 para frente, -1 para trás
+    float distanciaRestante = abs(distMetros);
+        
+    while(distanciaRestante > 0.005) {  // Precisão de 0.5cm
+        PWM_PID(sinal * 9, 0);  
+        delay(10);
+        
+        distanciaPercorrida = abs(roboX - posicaoInicial);
+        distanciaRestante = abs(distMetros) - distanciaPercorrida;
+        Serial.printf("🚶 Andando %.2f metros...\n", distMetros);
+    }
+    para();
+    Serial.printf("✅ Andou %.2f metros\n", distMetros);
+}
+
+void girarGraus(float anguloGraus) {
+    float anguloRad = anguloGraus * PI / 180.0; //graus para radianos
+    resetarPID();
+    
+    float thetaInicial = roboTheta;
+    float thetaPercorrido = 0;
+    int sinal = (anguloGraus > 0) ? 1 : -1; //1 para direita, -1 para esquerda
+    Serial.printf("🔄 Girando %.1f graus...\n", anguloGraus);
+    
+    while(abs(thetaPercorrido) < abs(anguloRad) - 0.01) {
+        PWM_PID(0, sinal * 4);
+        delay(10);
+        
+        thetaPercorrido = roboTheta - thetaInicial;
+        while(thetaPercorrido > PI) thetaPercorrido -= 2 * PI;
+        while(thetaPercorrido < -PI) thetaPercorrido += 2 * PI;
+    }  
+    para();
+    Serial.printf("✅ Girou %.1f graus\n", anguloGraus);
+}
+
+//Movimentos sem PID direto
+void movFrente(int timer) {
+    PWM_PID(9, 0);
     delay(timer);
     para();
 }
 
-void movT(int timer) {
-    PWM(-9, 0);
+void movTras(int timer) {
+    PWM_PID(-9, 0);
     delay(timer);
     para();
 }
 
-void girD(int timer) {
-    PWM(0, 4);
+void giroDir(int timer) {
+    PWM_PID(0, 4);
     delay(timer);
     para();
 }
 
-void girE(int timer) {
-    PWM(0, -4);
+void giroEsq(int timer) {
+    PWM_PID(0, -4);
     delay(timer);
     para();
 }
 
-void rotE_F(int timer) {
-    PWM(5, -5);
+void curvaNoroesteEF(int timer) {
+    PWM_PID(5, -5);
     delay(timer);
     para();
 }
 
-void rotE_T(int timer) {
-    PWM(-5, 5);
+void curvaSudoesteET(int timer) {
+    PWM_PID(-5, 5);
     delay(timer);
     para();
 }
 
-void rotD_F(int timer) {
-    PWM(5, 5);
+void curvaNordesteDF(int timer) {
+    PWM_PID(5, 5);
     delay(timer);
     para();
 }
 
-void rotD_T(int timer) {
-    PWM(-5, -5);
+void curvaSudesteDT(int timer) {
+    PWM_PID(-5, -5);
     delay(timer);
     para();
+}
+
+void desenharTrianguloEquilatero(float lado=0.5){
+    Serial.println("🔺 Desenhando triângulo equilátero...");
+
+    resetarOdometria();
+
+    for(int i=0; i < 3; i++){
+        movFrentePreciso(lado);
+        girarGraus(120) // Ângulo externo
+    }
+    Serial.println("✅ Triângulo feito!")
+}
+void desenharQuadrado(float lado = 0.5){
+    Serial.println("🔲 Desenhando quadrado...");
+
+    resetarOdometria();
+
+    for(int i=0; i < 4; i++){
+        movFrentePreciso(lado);
+        girarGraus(90);
+    }
+    Serial.println("✅ Quadrado feito!")
+}
+
+void desenharCoracao(float tamanho = 0.5) {
+    Serial.println("❤️ Desenhando coração...");
+    resetarOdometria();
+    
+    float lado = tamanho / 2;
+    
+    // Metade esquerda do coração
+    movFrentePreciso(lado);
+    girarGraus(45);
+    movFrentePreciso(lado);
+    girarGraus(45);
+    movFrentePreciso(lado);
+    girarGraus(45);
+    movFrentePreciso(lado);
+    
+    // Curva inferior (aproximada)
+    girarGraus(90);
+    movFrentePreciso(lado * 0.7);
+    girarGraus(45);
+    movFrentePreciso(lado * 0.7);
+    girarGraus(45);
+    movFrentePreciso(lado * 0.7);
+    
+    // Metade direita do coração (simétrica)
+    girarGraus(45);
+    movFrentePreciso(lado * 0.7);
+    girarGraus(45);
+    movFrentePreciso(lado * 0.7);
+    girarGraus(90);
+    movFrentePreciso(lado);
+    girarGraus(45);
+    movFrentePreciso(lado);
+    girarGraus(45);
+    movFrentePreciso(lado);
+    girarGraus(45);
+    movFrentePreciso(lado);
+    
+    Serial.println("✅ Coração completo!");
 }
 
 #endif
