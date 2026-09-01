@@ -43,6 +43,39 @@ const float DIST_POR_PULSO = CIRCUNF_RODAS / PULSOS_POR_REV;
 
 /* tem caixa de redução 48:1 */
 
+// ===== Compatibilidade de nomes (Português <-> Inglês) =====
+// Algumas unidades/headers do projeto usam nomes em inglês (ex: Odometry.h)
+// enquanto este arquivo usa nomes em português. Para manter compatibilidade
+// definimos aliases via macros para os nomes esperados nas outras unidades.
+
+#define WHEEL_BASE BASE_RODAS
+#define DIST_PER_PULSE DIST_POR_PULSO
+
+// IDs / nomes do robô
+#define robotId id_robo
+
+// Variáveis de odometria / pose
+#define robotX roboX
+#define robotY roboY
+#define robotTheta roboTheta
+#define robotVx robotVxLinear
+#define robotVy robotVyLinear
+#define robotVtheta roboVthetaAngular
+
+// Encoders / tempos
+#define lastPulsosEncoderE ultimoPulsosEncoderE
+#define lastPulsosEncoderD ultimoPulsosEncoderD
+#define lastOdometryTime ultimoTempoOdometria
+
+// LEDs
+#define NUM_LEDS num_leds
+
+// MP3 pins (alguns arquivos usam PIN_MP3_TX/RX)
+#define PIN_MP3_TX MP3_TX
+#define PIN_MP3_RX MP3_RX
+
+// ============================================================
+
 //PWM
 #define PWM_FREQ 1000
 #define PWM_RESOLUTION 8
