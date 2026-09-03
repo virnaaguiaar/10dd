@@ -19,18 +19,18 @@ const char* password = "11223344";
 const char* host = "Carrinho";
 
 // ID único do robô - gravado na EEPROM
-#define ID_ROBO 0
-char id_robo[16] = "robo1";  // Alterar a medida que troca de robo
+#define ROBOT_ID_ADDR 0
+char robotId[16] = "robo2";  // Alterar a medida que troca de robo
 
 // Configurações MQTT
 WebSocketsClient webSocket;
 bool mqttConnected = false;
 
-const char* mqtt_server = "e2792d91.ala.us-east-1.emqxsl.com";
+const char* mqtt_server = "bfea296c.ala.us-east-1.emqxsl.com";
 const int mqtt_port = 8084;
 const char* mqtt_path = "/mqtt";
-const char* mqtt_user = "baile";     
-const char* mqtt_password = "baile10";   
+const char* mqtt_user = "baile10d";     
+const char* mqtt_password = "Baile10D_2026!";   
 
 // Parâmetros do robô (para odometria e pid)
 const float BASE_RODAS = 0.230;      // Distância entre rodas (metros)
@@ -109,17 +109,17 @@ bool otaIsOpen = false;
 // Variáveis para os encoders
 volatile int pulsosEncoderE = 0;
 volatile int pulsosEncoderD = 0;
-volatile int ultimoPulsosEncoderE = 0;
-volatile int ultimoPulsosEncoderD = 0;
-unsigned long ultimoTempoOdometria = 0;
+volatile int lastPulsosEncoderE = 0;
+volatile int lastPulsosEncoderD = 0;
+unsigned long lastOdometryTime = 0;
 
 // Posição inicial do robô (para odometria)
-float roboX = 0.0;
-float roboY = 0.0;
-float roboTheta = 0.0;
-float roboVxLinear = 0.0;
-float roboVyLinear = 0.0;
-float roboVthetaAngular = 0.0;
+float robotX = 0.0;
+float robotY = 0.0;
+float robotTheta = 0.0;
+float robotVx = 0.0;
+float robotVy = 0.0;
+float robotVtheta = 0.0;
 
 // Funções de interrupção para o encoder 
 /*IRAM_ATTR: um macro para colocar a função na memória IRAM, para que ela possa 
@@ -147,8 +147,8 @@ void SetupEncoders() {
 void resetEncoders() {
   pulsosEncoderE = 0;
   pulsosEncoderD = 0;
-  ultimoPulsosEncoderE = 0;
-  ultimoPulsosEncoderD = 0;
+  lastPulsosEncoderE = 0;
+  lastPulsosEncoderD = 0;
 }
 
 //CONFIGURAÇÕES DA IDENTIFICAÇÃO DO ROBÔ
@@ -162,10 +162,10 @@ void carregarIdRobo() {
   }
   storedId[15] = '\0';
   if (strlen(storedId) > 0) {
-    strcpy(id_robo, storedId);
+    strcpy(robotId, storedId);
   }
   EEPROM.end();
-  Serial.printf("🤖 Robô ID: %s\n", id_robo);
+  Serial.printf("🤖 Robô ID: %s\n", robotId);
 }
 
 // Salva ID 
@@ -176,8 +176,8 @@ void salvarIdRobo(const char* novoIdRobo) {
   }
   EEPROM.commit();
   EEPROM.end();
-  strcpy(id_robo, novoIdRobo);
-  Serial.printf("💾 ID do robô salvo: %s\n", id_robo);
+  strcpy(robotId, novoIdRobo);
+  Serial.printf("💾 ID do robô salvo: %s\n", robotId);
 }
 
 int eepromNumero() {
@@ -195,5 +195,6 @@ void gravarEeprom(int temp) {
   EEPROM.writeFloat(0, num);
   EEPROM.end();
 }
+
 
 #endif

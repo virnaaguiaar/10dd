@@ -29,8 +29,8 @@ void updateOdometry() {
   int deltaE = pulsosEncoderE - lastPulsosEncoderE;
   int deltaD = pulsosEncoderD - lastPulsosEncoderD;
   
-  float distE = deltaE * DIST_PER_PULSE;
-  float distD = deltaD * DIST_PER_PULSE;
+  float distE = deltaE * DIST_POR_PULSO;
+  float distD = deltaD * DIST_POR_PULSO;
   
   // Velocidades lineares das rodas (m/s)
   float vE = distE / dt;
@@ -38,7 +38,7 @@ void updateOdometry() {
   
   // Velocidade linear e angular do robô
   float v = (vE + vD) / 2.0;
-  float w = (vD - vE) / WHEEL_BASE;
+  float w = (vD - vE) / BASE_RODAS;
   
   robotVx = v * cos(robotTheta);
   robotVy = v * sin(robotTheta);

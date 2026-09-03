@@ -2,6 +2,8 @@
 #define MOVIMENTO_H
 
 #include "Odometry.h"
+float lerVelocRealEsquerda();
+float lerVelocRealDireita();
 //quarto
 // Padrões de LEDs para cada movimento
 //colocar random???
@@ -59,10 +61,10 @@ void atualizarOdometria(){
     static unsigned long tempoFinal = 0;
     unsigned long tempoAtual = millis();
     float deltaTempo = (tempoAtual - tempoFinal) / 1000.0; // (s))
-    if (deltaTempo < 0.01) return 0; //evita divisao por zero
+    if (deltaTempo < 0.01) return; //evita divisao por zero
 
-    int deltaPulsosDir = pulsosEncoderD - ultimoPulsosEncoderD;// Atualização de quantos pulsos desde a leitura mais nova 
-    int deltaPulsosEsq = pulsosEncoderE - ultimoPulsosEncoderE; 
+    int deltaPulsosDir = pulsosEncoderD - lastPulsosEncoderD;// Atualização de quantos pulsos desde a leitura mais nova 
+    int deltaPulsosEsq = pulsosEncoderE - lastPulsosEncoderE; 
 
     float distRodaDir = deltaPulsosDir * DIST_POR_PULSO; //Distância percorrida pela roda (m)
     float distRodaEsq = deltaPulsosEsq * DIST_POR_PULSO;
@@ -70,43 +72,43 @@ void atualizarOdometria(){
     float velocRodaDir = distRodaDir / deltaTempo; //Velocidade da roda (m/s)
     float velocRodaEsq = distRodaEsq / deltaTempo;
 
-    roboVxLinear = (velocRodaDir + velocRodaEsq) / 2.0; //Velocidade linear do robô
-    roboVthetaAngular = (velocRodaDir - velocRodaEsq) / BASE_RODAS; //Velocidade angular do robô (rad/s)
+    robotVx = (velocRodaDir + velocRodaEsq) / 2.0; //Velocidade linear do robô
+    robotVtheta = (velocRodaDir - velocRodaEsq) / BASE_RODAS; //Velocidade angular do robô (rad/s)
 
     //Atualizar posição
-    roboX += roboVxLinear * cos(roboTheta) * deltaTempo;
-    roboY += roboVxLinear * sin(roboTheta) * deltaTempo;
-    roboTheta += roboVthetaAngular * deltaTempo;
+    robotX += robotVx * cos(robotTheta) * deltaTempo;
+    robotY += robotVx * sin(robotTheta) * deltaTempo;
+    robotTheta += robotVtheta * deltaTempo;
 
     //Normalizar para [-pi, pi], evitar ângulos confusos e saber sempre paar onde está opontando
     //evita overflow, facilita comparação como os ângulos são cíclicos
-    while(roboTheta > PI){
-        roboTheta -= 2*PI;
+    while(robotTheta > PI){
+        robotTheta -= 2*PI;
     }
-    while(roboTheta < -PI){
-        roboTheta += 2*PI;
+    while(robotTheta < -PI){
+        robotTheta += 2*PI;
     }
 
-    distTotalPercorrida += abs(roboVxLinear) * deltaTempo;
+    distTotalPercorrida += abs(robotVx) * deltaTempo;
 
-    ultimoPulsosEncoderD = pulsosEncoderD;
-    ultimoPulsosEncoderE = pulsosEncoderE;
+    lastPulsosEncoderD = pulsosEncoderD;
+    lastPulsosEncoderE = pulsosEncoderE;
     tempoFinal = tempoAtual;
 }
 
 void resetarOdometria(){
-    roboX = 0.0;
-    roboY = 0.0;
-    roboTheta = 0.0;
-    roboVxLinear = 0.0;
-    roboVyLinear = 0.0;
-    roboVthetaAngular = 0.0;
+    robotX = 0.0;
+    robotY = 0.0;
+    robotTheta = 0.0;
+    robotVx = 0.0;
+    robotVy = 0.0;
+    robotVtheta = 0.0;
     distTotalPercorrida = 0.0;
 
     pulsosEncoderD = 0;
     pulsosEncoderE = 0;
-    ultimoPulsosEncoderD = 0;
-    ultimoPulsosEncoderE = 0;
+    lastPulsosEncoderD = 0;
+    lastPulsosEncoderE = 0;
 
     Serial.println("🔄 Odometria resetada!");
 }
@@ -157,7 +159,7 @@ float lerVelocRealDireita(){
 float calcularPID(float erro){
     float erroProporcional = erro;
 
-    float erroIntegral += erro;
+    erroIntegral += erro;
     if (erroIntegral > 5.0) erroIntegral = 5.0; //evitar overshoot
     if (erroIntegral < -5.0) erroIntegral = -5.0;
 
@@ -321,7 +323,7 @@ void desligaLeds() {
 void movFrentePreciso(float distMetros) {
     resetarPID();
     
-    float posicaoInicial = roboX;
+    float posicaoInicial = robotX;
     float distanciaPercorrida = 0;
     int sinal = (distMetros > 0) ? 1 : -1; //1 para frente, -1 para trás
     float distanciaRestante = abs(distMetros);
@@ -330,7 +332,7 @@ void movFrentePreciso(float distMetros) {
         PWM_PID(sinal * 9, 0);  
         delay(10);
         
-        distanciaPercorrida = abs(roboX - posicaoInicial);
+        distanciaPercorrida = abs(robotX - posicaoInicial);
         distanciaRestante = abs(distMetros) - distanciaPercorrida;
         Serial.printf("🚶 Andando %.2f metros...\n", distMetros);
     }
@@ -342,7 +344,7 @@ void girarGraus(float anguloGraus) {
     float anguloRad = anguloGraus * PI / 180.0; //graus para radianos
     resetarPID();
     
-    float thetaInicial = roboTheta;
+    float thetaInicial = robotTheta;
     float thetaPercorrido = 0;
     int sinal = (anguloGraus > 0) ? 1 : -1; //1 para direita, -1 para esquerda
     Serial.printf("🔄 Girando %.1f graus...\n", anguloGraus);
@@ -351,7 +353,7 @@ void girarGraus(float anguloGraus) {
         PWM_PID(0, sinal * 4);
         delay(10);
         
-        thetaPercorrido = roboTheta - thetaInicial;
+        thetaPercorrido = robotTheta - thetaInicial;
         while(thetaPercorrido > PI) thetaPercorrido -= 2 * PI;
         while(thetaPercorrido < -PI) thetaPercorrido += 2 * PI;
     }  
@@ -415,10 +417,11 @@ void desenharTrianguloEquilatero(float lado=0.5){
 
     for(int i=0; i < 3; i++){
         movFrentePreciso(lado);
-        girarGraus(120) // Ângulo externo
+        girarGraus(120);
     }
-    Serial.println("✅ Triângulo feito!")
+    Serial.println("✅ Triângulo feito!");
 }
+
 void desenharQuadrado(float lado = 0.5){
     Serial.println("🔲 Desenhando quadrado...");
 
@@ -428,7 +431,7 @@ void desenharQuadrado(float lado = 0.5){
         movFrentePreciso(lado);
         girarGraus(90);
     }
-    Serial.println("✅ Quadrado feito!")
+    Serial.println("✅ Quadrado feito!"); 
 }
 
 void desenharCoracao(float tamanho = 0.5) {
