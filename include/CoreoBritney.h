@@ -32,7 +32,7 @@ static size_t etapaAtual = 0;
 static unsigned long inicioDaEtapa = 0;
 
 inline void aplicarLedsCoreografia(uint8_t estado) {
-  for (int i = 0; i < NUM_LEDS; ++i) {
+  for (int i = 0; i < num_leds; ++i) {
     digitalWrite(led[i], (estado & (1 << i)) ? HIGH : LOW);
   }
 }
@@ -40,7 +40,7 @@ inline void aplicarLedsCoreografia(uint8_t estado) {
 inline void iniciarEtapaCoreografia() {
   const CoreografiaEtapa& etapa = COREOGRAFIA[etapaAtual];
   aplicarLedsCoreografia(etapa.leds);
-  PWM(etapa.velocidadeX, etapa.velocidadeY);
+  PWM_PID(etapa.velocidadeX, etapa.velocidadeY);
   inicioDaEtapa = millis();
 }
 
@@ -57,7 +57,7 @@ inline void pararCoreografia() {
   if (!coreografiaEmExecucao) return;
 
   coreografiaEmExecucao = false;
-  PWM(0, 0);
+  PWM_PID(0, 0);
   desligaLeds();
   Serial.println("🛑 Coreografia interrompida");
 }
@@ -73,7 +73,7 @@ inline void atualizarCoreografia() {
   ++etapaAtual;
   if (etapaAtual >= COREOGRAFIA_ETAPAS) {
     coreografiaEmExecucao = false;
-    PWM(0, 0);
+    PWM_PID(0, 0);
     desligaLeds();
     Serial.println("🏁 Coreografia finalizada!");
     return;
