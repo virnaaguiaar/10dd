@@ -4,13 +4,13 @@
 #include "OtaSetup.h"
 #include "MQTTWebSocketCorrect.h"
 
-SoftwareSerial softwareSerial(PIN_MP3_RX, PIN_MP3_TX);
+SoftwareSerial softwareSerial(MP3_RX, MP3_TX);
 DFRobotDFPlayerMini player;
 
 void setup() {
   Serial.begin(115200);
   delay(100);
-
+  //salvarIdRobo("robo2          ");
   Serial.println("\n=== Carrinho 10 Dimensões ===");
   Serial.print("Versão: ");
   Serial.println(version);
@@ -18,7 +18,7 @@ void setup() {
   SetupLeds();
   Mp3Setup();
   SetupEncoders();
-  loadRobotId();
+  carregarIdRobo();
   localization.setup();
   multiRobotCoord.setup();
 

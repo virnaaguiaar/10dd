@@ -6,9 +6,8 @@
 #include <map>
 #include <vector>
 
-void PWM(int dirX, int dirY);
+void PWM_PID(int direcaoX, int direcaoY);
 
-// Modos de evitação
 enum AvoidanceMode {
   AVOID_OFF = 0,
   AVOID_SIMPLE,      // Evita apenas quando muito próximo
@@ -211,10 +210,10 @@ public:
   }
   
   // Comando de parada de emergência
-  void emergencyStop() {
-    PWM(0, 0);
-    Serial.println("🚨 Parada de emergência por risco de colisão");
-  }
+void emergencyStop() {
+  PWM_PID(0, 0); 
+  Serial.println("🚨 Parada de emergência por risco de colisão");
+}
 
   
   // Publica status de evitação para debug

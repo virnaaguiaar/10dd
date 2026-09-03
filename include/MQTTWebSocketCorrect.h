@@ -168,7 +168,7 @@ void processMQTTCommand(const String& message) {
         Serial.println("🛑 PARAR");
         autoModeEnabled = false;
         pararCoreografia();
-        PWM(0, 0);
+        PWM_PID(0, 0);
         desligaLeds();
         return;
     }
@@ -226,7 +226,7 @@ void processMQTTCommand(const String& message) {
         if (xDir == '-') velX = -velX;
         if (yDir == '-') velY = -velY;
         
-        PWM(velX, velY);
+        PWM_PID(velX, velY);
         Serial.printf("🕹️ Movimento: X=%d, Y=%d\n", velX, velY);
         return;
     }
@@ -234,14 +234,14 @@ void processMQTTCommand(const String& message) {
     // SET ROBOT ID
     else if (message.startsWith("DN0ID")) {
         String newId = message.substring(5);
-        saveRobotId(newId.c_str());
+        salvarIdRobo(newId.c_str());
         publishMQTT("robot/status", "ID updated");
         return;
     }
     
     // RESET ODOMETRY
     else if (message == "DN0RST") {
-        resetOdometry();
+        resetarOdometria();
         localization.setup();  // Reinicia localização
         publishMQTT("robot/status", "Odometry reset");
         return;
@@ -317,7 +317,7 @@ void processMQTTCommand(const String& message) {
     // PARAR MODO AUTÔNOMO
     else if (message == "DN0STOPAUTO") {
         autoModeEnabled = false;
-        PWM(0, 0);
+        PWM_PID(0, 0);
         Serial.println("⏹️ Modo autônomo desativado");
         return;
     }
@@ -327,7 +327,7 @@ void processMQTTCommand(const String& message) {
         Serial.println("🚨 PARADA DE EMERGÊNCIA GLOBAL!");
         autoModeEnabled = false;
         pararCoreografia();
-        PWM(0, 0);
+        PWM_PID(0, 0);
         desligaLeds();
         player.stop();
         publishMQTT("robot/emergency", "activated");
@@ -516,7 +516,7 @@ void mqttLoop() {
                 
                 if (avoidX != 0 || avoidY != 0) {
                     // Aplica correção de movimento se houver perigo
-                    PWM(avoidX, avoidY);
+                    PWM_PID(avoidX, avoidY);
                     // Pequeno delay para não sobrecarregar
                     delay(20);
                 }
@@ -529,7 +529,7 @@ void mqttLoop() {
                 if (abs(errorX) < 2 && abs(errorY) < 2) {
                     // Chegou ao destino
                     autoModeEnabled = false;
-                    PWM(0, 0);
+                    PWM_PID(0, 0);
                     Serial.println("✅ Destino alcançado!");
                     publishMQTT("robot/status", "destination_reached");
                 } else {
@@ -544,7 +544,7 @@ void mqttLoop() {
                     cmdX = constrain(cmdX + avoidX, -9, 9);
                     cmdY = constrain(cmdY + avoidY, -9, 9);
                     
-                    PWM(cmdX, cmdY);
+                    PWM_PID(cmdX, cmdY);
                 }
             }
         }
